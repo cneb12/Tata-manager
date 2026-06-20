@@ -40,7 +40,7 @@ h1{font-size:17px;font-weight:600}
 h2{font-size:17px;font-weight:600;margin-bottom:14px}
 h3{font-size:12px;font-weight:600;margin-bottom:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
 label{font-size:13px;color:var(--text2);display:block;margin-bottom:5px}
-input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;background:var(--bg);color:var(--text);font-family:inherit;-webkit-appearance:none;appearance:none}
+input,select{width:100%;padding:10px 12px;border:1px solid var(--border2);border-radius:var(--radius);font-size:14px;background:var(--bg);color:var(--text);font-family:inherit;-webkit-appearance:none;appearance:none}
 input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,0.15)}
 .field{margin-bottom:12px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -82,12 +82,10 @@ input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .pill-req{background:var(--pink-bg);color:var(--pink)}
 .pill-ok{background:var(--teal-bg);color:var(--teal)}
 .entry-actions{display:flex;flex-direction:column;gap:4px;flex-shrink:0;margin-top:4px}
-.divider{height:1px;background:var(--border);margin:14px 0}
 .summary-row{display:flex;justify-content:space-between;padding:8px 0;font-size:14px;border-bottom:1px solid var(--border)}
 .summary-row:last-child{border-bottom:none;font-weight:600;font-size:15px}
 .req-banner{background:var(--pink-bg);border:1px solid var(--pink-border);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px}
 .req-banner-text{font-size:13px;color:var(--pink)}
-.req-banner-amount{font-size:18px;font-weight:600;color:var(--pink);white-space:nowrap}
 .nav-bottom{position:fixed;bottom:0;left:0;right:0;background:var(--bg);border-top:1px solid var(--border);display:flex;padding:8px 0 max(8px,env(safe-area-inset-bottom));z-index:10}
 .nav-btn{flex:1;padding:6px 4px;border:none;background:none;font-size:10px;font-weight:500;color:var(--text2);cursor:pointer;text-align:center;border-radius:var(--radius);display:flex;flex-direction:column;align-items:center;gap:2px;font-family:inherit}
 .nav-btn i{font-size:22px}
@@ -108,13 +106,16 @@ input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 .sheet-handle{width:36px;height:4px;background:var(--bg3);border-radius:2px;margin:0 auto 1.25rem}
 .sheet h3{font-size:16px;font-weight:600;text-transform:none;letter-spacing:0;margin-bottom:12px;color:var(--text)}
 .toast-bar{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:9px 20px;border-radius:24px;font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;z-index:200;max-width:90vw;text-align:center}
+.sync-bar{position:fixed;top:0;left:0;right:0;background:var(--teal);color:#fff;font-size:12px;font-weight:500;text-align:center;padding:6px;z-index:300;transform:translateY(-100%);transition:transform .3s}
+.sync-bar.active{transform:translateY(0)}
 </style>
 </head>
 <body>
 
+<div class="sync-bar" id="sync-bar">⟳ Sincronizzazione in corso...</div>
 <div class="toast-bar" id="toast"></div>
 
-<!-- OVERLAY RICHIESTA CASH (TATA) -->
+<!-- OVERLAY RICHIESTA CASH -->
 <div class="overlay" id="overlay-cash">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -129,7 +130,7 @@ input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   </div>
 </div>
 
-<!-- OVERLAY APPROVA (CAMILLA) -->
+<!-- OVERLAY APPROVA -->
 <div class="overlay" id="overlay-approva">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -193,6 +194,9 @@ input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
     <button class="btn" onclick="login('camilla')">
       <i class="ti ti-shield"></i> Sono Camilla
     </button>
+    <div id="login-status" style="text-align:center;margin-top:16px;font-size:13px;color:var(--text2);display:none">
+      <span class="spinner"></span>Connessione al database...
+    </div>
   </div>
 </div>
 
@@ -205,6 +209,7 @@ input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
     </div>
     <button class="role-badge" id="home-badge" onclick="logout()"></button>
   </div>
+  <div id="home-loading" style="text-align:center;padding:2rem;color:var(--text2);font-size:13px;display:none"><span class="spinner"></span>Caricamento dati...</div>
   <div id="pending-reqs"></div>
   <div class="metrics" id="home-metrics"></div>
   <div class="monte-card">
@@ -285,6 +290,7 @@ input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
   <div class="month-row">
     <label style="margin:0;white-space:nowrap;font-size:13px;font-weight:500">Mese:</label>
     <select id="stor-month" onchange="renderStorico()"></select>
+    <button class="btn btn-sm" onclick="loadAll(true)" title="Aggiorna"><i class="ti ti-refresh"></i></button>
   </div>
   <div id="stor-list"></div>
   <div class="nav-bottom">
@@ -317,135 +323,195 @@ input:focus,select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 
 </div>
 
 <script>
-const STIPENDIO=1400,ORE_SETT=30,TARIFFA_EXTRA=10,TARIFFA_SERALE_CASH=10;
-let role='',editingId=null,approvingId=null;
-let appData={entries:[],monteOre:0};
+// ── SUPABASE CONFIG ──────────────────────────────────────────────
+const SUPA_URL = 'https://efxormqttpuspyamzvuq.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmeG9ybXF0dHB1c3B5YW16dnVxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2MjI3MjgsImV4cCI6MjA5NzE5ODcyOH0.dViGzCjEVWcTjBv-tV0FEjazvaCCAhe3VcA6FJnskLQ';
 
-function save(){try{localStorage.setItem('ore_gigio_v1',JSON.stringify(appData));}catch(e){}}
-function load(){try{const d=localStorage.getItem('ore_gigio_v1');if(d)appData=JSON.parse(d);}catch(e){}}
+const H = { 'Content-Type': 'application/json', 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY };
 
-function toast(msg,dur=2500){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.style.opacity='1';
-  clearTimeout(t._t);t._t=setTimeout(()=>t.style.opacity='0',dur);
+async function dbGet(table, filter='') {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?${filter}&order=id.asc`, { headers: H });
+  return res.ok ? res.json() : [];
+}
+async function dbInsert(table, row) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}`, {
+    method: 'POST', headers: { ...H, 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  return res.ok;
+}
+async function dbUpdate(table, id, row) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'PATCH', headers: { ...H, 'Prefer': 'return=representation' },
+    body: JSON.stringify(row)
+  });
+  return res.ok;
+}
+async function dbDelete(table, id) {
+  const res = await fetch(`${SUPA_URL}/rest/v1/${table}?id=eq.${id}`, {
+    method: 'DELETE', headers: H
+  });
+  return res.ok;
+}
+async function getMonte() {
+  const rows = await dbGet('monte_ore', 'id=eq.1');
+  return rows && rows[0] ? rows[0].valore : 0;
+}
+async function setMonte(v) {
+  await dbUpdate('monte_ore', 1, { valore: Math.round(v * 10) / 10 });
 }
 
-function diffH(s,e){
-  const[sh,sm]=s.split(':').map(Number);const[eh,em]=e.split(':').map(Number);
-  let d=(eh+em/60)-(sh+sm/60);if(d<0)d+=24;return Math.round(d*10)/10;
+// ── APP STATE ────────────────────────────────────────────────────
+const STIPENDIO=1400, ORE_SETT=30, TARIFFA_EXTRA=10, TARIFFA_SERALE=10;
+let role='', entries=[], monteOre=0, editingId=null, approvingId=null;
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function toast(msg, dur=2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(t._t); t._t = setTimeout(() => t.style.opacity = '0', dur);
 }
-function fmtH(h){
-  if(h===0)return'0h';
-  const abs=Math.abs(h);const sign=h<0?'−':'';
-  return abs%1===0?sign+abs+'h':sign+abs.toFixed(1)+'h';
+function syncBar(on) {
+  document.getElementById('sync-bar').classList.toggle('active', on);
 }
-function fmtMonth(ym){
-  const[y,m]=ym.split('-');
-  const n=['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
-  return n[parseInt(m)]+' '+y;
+function diffH(s, e) {
+  const [sh,sm] = s.split(':').map(Number), [eh,em] = e.split(':').map(Number);
+  let d = (eh+em/60)-(sh+sm/60); if(d<0) d+=24;
+  return Math.round(d*10)/10;
 }
-function fmtDate(d){return d.split('-').reverse().join('/');}
-function curYM(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
-function entriesForMonth(ym){return appData.entries.filter(e=>e.date.startsWith(ym));}
-function getMonths(){
-  const s=new Set([curYM()]);
-  appData.entries.forEach(e=>s.add(e.date.substring(0,7)));
+function fmtH(h) {
+  if(h===0) return '0h';
+  const abs=Math.abs(h), sign=h<0?'−':'';
+  return abs%1===0 ? sign+abs+'h' : sign+abs.toFixed(1)+'h';
+}
+function fmtMonth(ym) {
+  const [y,m]=ym.split('-');
+  return ['','Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'][parseInt(m)]+' '+y;
+}
+function fmtDate(d) { return d.split('-').reverse().join('/'); }
+function curYM() { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+function forMonth(ym) { return entries.filter(e => e.date && e.date.startsWith(ym)); }
+function getMonths() {
+  const s = new Set([curYM()]);
+  entries.forEach(e => e.date && s.add(e.date.substring(0,7)));
   return Array.from(s).sort().reverse();
 }
-function populateMonthSelects(){
-  const months=getMonths();
-  ['stor-month','mese-month'].forEach(id=>{
-    const sel=document.getElementById(id);const cur=sel.value;
-    sel.innerHTML=months.map(m=>`<option value="${m}">${fmtMonth(m)}</option>`).join('');
-    if(cur&&months.includes(cur))sel.value=cur;
+function populateMonthSelects() {
+  const months = getMonths();
+  ['stor-month','mese-month'].forEach(id => {
+    const sel = document.getElementById(id), cur = sel.value;
+    sel.innerHTML = months.map(m => `<option value="${m}">${fmtMonth(m)}</option>`).join('');
+    if(cur && months.includes(cur)) sel.value = cur;
   });
 }
 
-function login(r){
-  role=r;load();
-  showPage('pg-home');
-  setBadges();populateMonthSelects();renderHome();
+// ── DB LOAD ──────────────────────────────────────────────────────
+async function loadAll(silent=false) {
+  if(!silent) document.getElementById('home-loading').style.display='block';
+  try {
+    const [rows, mo] = await Promise.all([dbGet('entries'), getMonte()]);
+    entries = (rows||[]).map(r => ({
+      id: r.id, date: r.date, type: r.type,
+      start: r.start_time||'', end: r.end_time||'',
+      hours: r.hours||0, monteOre: r.monte_ore||0, cash: r.cash||0,
+      oreRichieste: r.ore_richieste||0, importoRichiesto: r.importo_richiesto||0,
+      stato: r.stato||'', note: r.note||''
+    }));
+    monteOre = mo;
+  } catch(e) { toast('Errore di connessione — riprova'); }
+  document.getElementById('home-loading').style.display='none';
+  populateMonthSelects(); renderHome();
 }
-function logout(){if(confirm('Cambiare utente?')){role='';showPage('pg-login');}}
 
-function showPage(id){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+// ── AUTH ─────────────────────────────────────────────────────────
+async function login(r) {
+  role = r;
+  document.getElementById('login-status').style.display='block';
+  showPage('pg-home'); setBadges();
+  await loadAll();
+  document.getElementById('login-status').style.display='none';
+}
+function logout() {
+  if(confirm('Cambiare utente?')) { role=''; entries=[]; monteOre=0; showPage('pg-login'); }
+}
+
+// ── NAV ──────────────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
 }
-function setBadges(){
-  const cls=role==='tata'?'role-tata':'role-camilla';
-  const lbl=role==='tata'?'Tata ↩':'Camilla ↩';
-  ['home-badge','log-badge','stor-badge','mese-badge'].forEach(id=>{
-    const el=document.getElementById(id);if(el){el.className='role-badge '+cls;el.textContent=lbl;}
+function setBadges() {
+  const cls = role==='tata' ? 'role-tata' : 'role-camilla';
+  const lbl = role==='tata' ? 'Tata ↩' : 'Camilla ↩';
+  ['home-badge','log-badge','stor-badge','mese-badge'].forEach(id => {
+    const el=document.getElementById(id); if(el){el.className='role-badge '+cls;el.textContent=lbl;}
   });
 }
-function goPage(name){
+function goPage(name) {
   showPage('pg-'+name);
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  const nav=['home','log','storico','mese'].indexOf(name);
-  document.querySelectorAll('.nav-btn').forEach((b,i)=>{
-    if(Math.floor(i/4)===0&&i%4===nav)b.classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const pages=['home','log','storico','mese'];
+  document.querySelectorAll(`.nav-btn`).forEach((b,i) => {
+    if(i % 4 === pages.indexOf(name)) b.classList.add('active');
   });
-  closeOverlay('overlay-cash');closeOverlay('overlay-approva');closeOverlay('overlay-edit');
-  editingId=null;
-  setBadges();
-  if(name==='home')renderHome();
-  if(name==='log'){
-    document.getElementById('l-date').value=new Date().toISOString().split('T')[0];
-    document.getElementById('l-type').value='standard';
-    document.getElementById('l-note').value='';
-    document.getElementById('l-btn-label').textContent='Salva';
+  closeOverlay('overlay-cash'); closeOverlay('overlay-approva'); closeOverlay('overlay-edit');
+  editingId=null; setBadges();
+  if(name==='home') renderHome();
+  if(name==='log') {
+    document.getElementById('l-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('l-type').value = 'standard';
+    document.getElementById('l-note').value = '';
+    document.getElementById('l-btn-label').textContent = 'Salva';
     updatePreview();
   }
-  if(name==='storico'){populateMonthSelects();renderStorico();}
-  if(name==='mese'){populateMonthSelects();renderMese();}
+  if(name==='storico') { populateMonthSelects(); renderStorico(); }
+  if(name==='mese') { populateMonthSelects(); renderMese(); }
 }
+function openOverlay(id) { document.getElementById(id).classList.add('active'); }
+function closeOverlay(id) { document.getElementById(id).classList.remove('active'); }
 
-function openOverlay(id){document.getElementById(id).classList.add('active');}
-function closeOverlay(id){document.getElementById(id).classList.remove('active');}
-
-function calcEntry(type,start,end,absH){
-  let hours=0,monteOre=0,cash=0;
-  if(type==='standard'||type==='extra'||type==='serale'){hours=diffH(start,end);}
-  if(type==='extra')monteOre=hours;
-  if(type==='serale'){monteOre=hours;cash=Math.round(hours*TARIFFA_SERALE_CASH);}
-  if(type==='assenza'){hours=absH||0;monteOre=-Math.max(0,ORE_SETT-hours);}
-  return{hours,monteOre,cash};
+// ── CALC ─────────────────────────────────────────────────────────
+function calcEntry(type, start, end, absH) {
+  let hours=0, monteOre=0, cash=0;
+  if(type!=='assenza') hours=diffH(start,end);
+  if(type==='extra') monteOre=hours;
+  if(type==='serale') { monteOre=hours; cash=Math.round(hours*TARIFFA_SERALE); }
+  if(type==='assenza') { hours=absH||0; monteOre=-Math.max(0,ORE_SETT-hours); }
+  return {hours,monteOre,cash};
 }
-function previewText(type,start,end,absH){
-  if(type==='standard'&&start&&end)return`${fmtH(diffH(start,end))} ore standard — comprese nelle 30h/settimana`;
-  if(type==='extra'&&start&&end){const h=diffH(start,end);return`${fmtH(h)} ore extra → +${fmtH(h)} al monte ore`;}
-  if(type==='serale'&&start&&end){const h=diffH(start,end);return`${fmtH(h)} ore serali → +${fmtH(h)} al monte ore + €${Math.round(h*TARIFFA_SERALE_CASH)} cash`;}
-  if(type==='assenza'){const miss=Math.max(0,ORE_SETT-(absH||0));return miss>0?`Settimana corta: −${fmtH(miss)} dal monte ore`:`Settimana completa — nessuna modifica al monte ore`;}
-  return'Inserisci gli orari per vedere il calcolo';
+function previewText(type, start, end, absH) {
+  if(type==='standard'&&start&&end) return `${fmtH(diffH(start,end))} ore standard — comprese nelle 30h/settimana`;
+  if(type==='extra'&&start&&end) { const h=diffH(start,end); return `${fmtH(h)} ore extra → +${fmtH(h)} al monte ore`; }
+  if(type==='serale'&&start&&end) { const h=diffH(start,end); return `${fmtH(h)} ore serali → +${fmtH(h)} al monte ore + €${Math.round(h*TARIFFA_SERALE)} cash`; }
+  if(type==='assenza') { const miss=Math.max(0,ORE_SETT-(absH||0)); return miss>0?`Settimana corta: −${fmtH(miss)} dal monte ore`:`Settimana completa`; }
+  return 'Inserisci gli orari per vedere il calcolo';
 }
-
-function updatePreview(){
+function updatePreview() {
   const type=document.getElementById('l-type').value;
-  const isAbs=type==='assenza';
-  document.getElementById('l-time-row').style.display=isAbs?'none':'block';
-  document.getElementById('l-abs-row').style.display=isAbs?'block':'none';
+  document.getElementById('l-time-row').style.display = type==='assenza'?'none':'block';
+  document.getElementById('l-abs-row').style.display = type==='assenza'?'block':'none';
   if(type==='standard'){document.getElementById('l-start').value='12:30';document.getElementById('l-end').value='18:30';}
   if(type==='serale'&&document.getElementById('l-start').value==='12:30'){document.getElementById('l-start').value='19:30';document.getElementById('l-end').value='23:30';}
   const absH=parseFloat(document.getElementById('l-abs-hours').value)||0;
   document.getElementById('l-preview').textContent=previewText(type,document.getElementById('l-start').value,document.getElementById('l-end').value,absH);
 }
-function updateEditPreview(){
+function updateEditPreview() {
   const type=document.getElementById('edit-type').value;
   document.getElementById('edit-time-row').style.display=type==='assenza'?'none':'block';
   document.getElementById('edit-abs-row').style.display=type==='assenza'?'block':'none';
   const absH=parseFloat(document.getElementById('edit-abs-hours').value)||0;
   document.getElementById('edit-preview').textContent=previewText(type,document.getElementById('edit-start').value,document.getElementById('edit-end').value,absH);
 }
-function updateCashPreview(){
+function updateCashPreview() {
   const ore=parseFloat(document.getElementById('cash-ore').value)||0;
   const el=document.getElementById('cash-preview');
   if(ore<=0){el.textContent='Inserisci le ore';return;}
-  if(ore>appData.monteOre){el.textContent=`Non hai abbastanza ore (disponibili: ${fmtH(appData.monteOre)})`;return;}
+  if(ore>monteOre){el.textContent=`Non hai abbastanza ore (disponibili: ${fmtH(monteOre)})`;return;}
   el.textContent=`${fmtH(ore)} ore × €10 = €${Math.round(ore*10)} in contanti`;
 }
 
-async function submitEntry(){
+// ── CRUD ─────────────────────────────────────────────────────────
+async function submitEntry() {
   const date=document.getElementById('l-date').value;
   const type=document.getElementById('l-type').value;
   const start=document.getElementById('l-start').value;
@@ -455,24 +521,38 @@ async function submitEntry(){
   if(!date){toast('Inserisci la data');return;}
   if(type!=='assenza'&&(!start||!end)){toast('Inserisci orario');return;}
   const btn=document.getElementById('l-submit-btn');
-  btn.disabled=true;document.getElementById('l-btn-label').textContent='Salvo...';
-  if(editingId){
-    const old=appData.entries.find(e=>e.id===editingId);
-    if(old)appData.monteOre-=old.monteOre;
-    appData.entries=appData.entries.filter(e=>e.id!==editingId);
-  }
+  btn.disabled=true; document.getElementById('l-btn-label').textContent='Salvo...';
+  syncBar(true);
   const calc=calcEntry(type,start,end,absH);
-  const entry={id:editingId||Date.now(),date,type,start:type!=='assenza'?start:'',end:type!=='assenza'?end:'',hours:calc.hours,monteOre:calc.monteOre,cash:calc.cash,note};
-  appData.entries.push(entry);
-  appData.monteOre=Math.round((appData.monteOre+calc.monteOre)*10)/10;
-  save();
-  toast(editingId?'Modifica salvata ✓':'Registrazione salvata ✓');
-  editingId=null;btn.disabled=false;document.getElementById('l-btn-label').textContent='Salva';
-  populateMonthSelects();goPage('storico');
+  const row={
+    id: editingId||Date.now(), date, type,
+    start_time: type!=='assenza'?start:'', end_time: type!=='assenza'?end:'',
+    hours: calc.hours, monte_ore: calc.monteOre, cash: calc.cash, note
+  };
+  let ok;
+  if(editingId) {
+    const old=entries.find(e=>e.id===editingId);
+    const monteDiff = calc.monteOre - (old?old.monteOre:0);
+    ok = await dbUpdate('entries', editingId, row);
+    if(ok) { await setMonte(monteOre+monteDiff); monteOre+=monteDiff; }
+  } else {
+    ok = await dbInsert('entries', row);
+    if(ok) { await setMonte(monteOre+calc.monteOre); monteOre+=calc.monteOre; }
+  }
+  syncBar(false);
+  if(ok) {
+    toast(editingId?'Modifica salvata ✓':'Registrazione salvata ✓');
+    editingId=null;
+    await loadAll(true);
+    goPage('storico');
+  } else {
+    toast('Errore nel salvataggio');
+  }
+  btn.disabled=false; document.getElementById('l-btn-label').textContent='Salva';
 }
 
-function openEdit(id){
-  const e=appData.entries.find(x=>x.id===id);
+function openEdit(id) {
+  const e=entries.find(x=>x.id===id);
   if(!e||e.type==='richiesta_cash'){toast('Non modificabile direttamente');return;}
   editingId=id;
   document.getElementById('edit-date').value=e.date;
@@ -484,7 +564,8 @@ function openEdit(id){
   updateEditPreview();
   openOverlay('overlay-edit');
 }
-function saveEdit(){
+
+async function saveEdit() {
   const date=document.getElementById('edit-date').value;
   const type=document.getElementById('edit-type').value;
   const start=document.getElementById('edit-start').value;
@@ -492,36 +573,46 @@ function saveEdit(){
   const absH=parseFloat(document.getElementById('edit-abs-hours').value)||0;
   const note=document.getElementById('edit-note').value;
   if(!date){toast('Inserisci la data');return;}
-  const old=appData.entries.find(e=>e.id===editingId);
-  if(old)appData.monteOre-=old.monteOre;
-  appData.entries=appData.entries.filter(e=>e.id!==editingId);
+  syncBar(true);
   const calc=calcEntry(type,start,end,absH);
-  const entry={id:editingId,date,type,start:type!=='assenza'?start:'',end:type!=='assenza'?end:'',hours:calc.hours,monteOre:calc.monteOre,cash:calc.cash,note};
-  appData.entries.push(entry);
-  appData.monteOre=Math.round((appData.monteOre+calc.monteOre)*10)/10;
-  save();closeOverlay('overlay-edit');editingId=null;
-  toast('Modifica salvata ✓');renderStorico();renderHome();
-}
-function deleteEntry(id){
-  if(!confirm('Eliminare questa registrazione?'))return;
-  const e=appData.entries.find(x=>x.id===id);
-  if(e)appData.monteOre=Math.round((appData.monteOre-e.monteOre)*10)/10;
-  appData.entries=appData.entries.filter(x=>x.id!==id);
-  save();renderStorico();renderHome();toast('Eliminato');
+  const old=entries.find(e=>e.id===editingId);
+  const monteDiff=calc.monteOre-(old?old.monteOre:0);
+  const row={date,type,start_time:type!=='assenza'?start:'',end_time:type!=='assenza'?end:'',hours:calc.hours,monte_ore:calc.monteOre,cash:calc.cash,note};
+  const ok=await dbUpdate('entries',editingId,row);
+  if(ok){ await setMonte(monteOre+monteDiff); monteOre+=monteDiff; }
+  syncBar(false);
+  closeOverlay('overlay-edit'); editingId=null;
+  if(ok){ toast('Modifica salvata ✓'); await loadAll(true); renderStorico(); }
+  else toast('Errore nel salvataggio');
 }
 
-function inviaCashRequest(){
+async function deleteEntry(id) {
+  if(!confirm('Eliminare questa registrazione?'))return;
+  syncBar(true);
+  const e=entries.find(x=>x.id===id);
+  const ok=await dbDelete('entries',id);
+  if(ok&&e){ await setMonte(monteOre-e.monteOre); monteOre-=e.monteOre; }
+  syncBar(false);
+  if(ok){ toast('Eliminato'); await loadAll(true); renderStorico(); renderHome(); }
+  else toast('Errore nella cancellazione');
+}
+
+async function inviaCashRequest() {
   const ore=parseFloat(document.getElementById('cash-ore').value)||0;
-  if(ore<=0||ore>appData.monteOre){toast('Ore non valide');return;}
+  if(ore<=0||ore>monteOre){toast('Ore non valide');return;}
   const imp=Math.round(ore*TARIFFA_EXTRA);
-  const entry={id:Date.now(),date:new Date().toISOString().split('T')[0],type:'richiesta_cash',hours:0,monteOre:0,cash:0,oreRichieste:ore,importoRichiesto:imp,stato:'in_attesa',note:`Richiesta cash: ${fmtH(ore)} × €${TARIFFA_EXTRA} = €${imp}`};
-  appData.entries.push(entry);save();
+  syncBar(true);
+  const row={id:Date.now(),date:new Date().toISOString().split('T')[0],type:'richiesta_cash',hours:0,monte_ore:0,cash:0,ore_richieste:ore,importo_richiesto:imp,stato:'in_attesa',note:`Richiesta cash: ${fmtH(ore)} × €${TARIFFA_EXTRA} = €${imp}`};
+  const ok=await dbInsert('entries',row);
+  syncBar(false);
   closeOverlay('overlay-cash');
   document.getElementById('cash-ore').value='';
-  toast(`Richiesta di €${imp} inviata a Camilla ✓`);renderHome();populateMonthSelects();
+  if(ok){ toast(`Richiesta di €${imp} inviata a Camilla ✓`); await loadAll(true); }
+  else toast('Errore nell\'invio');
 }
-function openApprova(id){
-  const e=appData.entries.find(x=>x.id===id);if(!e)return;
+
+function openApprova(id) {
+  const e=entries.find(x=>x.id===id); if(!e)return;
   approvingId=id;
   document.getElementById('approva-body').innerHTML=`
     <div style="background:var(--bg2);border-radius:var(--radius);padding:14px;margin-bottom:14px">
@@ -529,40 +620,47 @@ function openApprova(id){
       <div style="font-size:26px;font-weight:700;color:var(--amber)">€${e.importoRichiesto}</div>
       <div style="font-size:13px;color:var(--text2);margin-top:2px">${fmtH(e.oreRichieste)} ore scalate dal monte ore</div>
     </div>
-    <div style="font-size:13px;color:var(--text2)">Monte ore attuale: <strong>${fmtH(appData.monteOre)}</strong> → dopo l'approvazione: <strong>${fmtH(appData.monteOre-e.oreRichieste)}</strong></div>
-  `;
+    <div style="font-size:13px;color:var(--text2)">Monte ore attuale: <strong>${fmtH(monteOre)}</strong> → dopo: <strong>${fmtH(monteOre-e.oreRichieste)}</strong></div>`;
   openOverlay('overlay-approva');
 }
-function approvaRichiesta(){
-  const e=appData.entries.find(x=>x.id===approvingId);if(!e)return;
-  if(e.oreRichieste>appData.monteOre){toast('Monte ore insufficiente');closeOverlay('overlay-approva');return;}
-  e.stato='approvata';e.monteOre=-e.oreRichieste;
-  appData.monteOre=Math.round((appData.monteOre-e.oreRichieste)*10)/10;
-  save();closeOverlay('overlay-approva');approvingId=null;
-  toast(`€${e.importoRichiesto} approvati ✓`);renderHome();populateMonthSelects();
-}
-function rifiutaRichiesta(){
-  const e=appData.entries.find(x=>x.id===approvingId);if(!e)return;
-  e.stato='rifiutata';save();closeOverlay('overlay-approva');approvingId=null;
-  toast('Richiesta rifiutata');renderHome();
+
+async function approvaRichiesta() {
+  const e=entries.find(x=>x.id===approvingId); if(!e)return;
+  if(e.oreRichieste>monteOre){toast('Monte ore insufficiente');closeOverlay('overlay-approva');return;}
+  syncBar(true);
+  const ok=await dbUpdate('entries',approvingId,{stato:'approvata',monte_ore:-e.oreRichieste});
+  if(ok){ await setMonte(monteOre-e.oreRichieste); monteOre-=e.oreRichieste; }
+  syncBar(false);
+  closeOverlay('overlay-approva'); approvingId=null;
+  if(ok){ toast(`€${e.importoRichiesto} approvati ✓`); await loadAll(true); }
+  else toast('Errore');
 }
 
-function renderHome(){
+async function rifiutaRichiesta() {
+  const e=entries.find(x=>x.id===approvingId); if(!e)return;
+  syncBar(true);
+  const ok=await dbUpdate('entries',approvingId,{stato:'rifiutata'});
+  syncBar(false);
+  closeOverlay('overlay-approva'); approvingId=null;
+  if(ok){ toast('Richiesta rifiutata'); await loadAll(true); }
+}
+
+// ── RENDER ───────────────────────────────────────────────────────
+function renderHome() {
   setBadges();
-  const ym=curYM();
-  const entries=entriesForMonth(ym);
-  const oreStd=entries.filter(e=>e.type==='standard').reduce((s,e)=>s+e.hours,0);
-  const oreExtra=entries.filter(e=>e.monteOre>0).reduce((s,e)=>s+e.monteOre,0);
-  const cashMese=entries.filter(e=>e.type==='serale').reduce((s,e)=>s+e.cash,0);
-  const pending=appData.entries.filter(e=>e.type==='richiesta_cash'&&e.stato==='in_attesa');
+  const ym=curYM(), list=forMonth(ym);
+  const oreStd=list.filter(e=>e.type==='standard').reduce((s,e)=>s+e.hours,0);
+  const oreExtra=list.filter(e=>e.monteOre>0).reduce((s,e)=>s+e.monteOre,0);
+  const cashMese=list.filter(e=>e.type==='serale').reduce((s,e)=>s+e.cash,0);
+  const pending=entries.filter(e=>e.type==='richiesta_cash'&&e.stato==='in_attesa');
   document.getElementById('home-title').textContent=role==='tata'?'Ciao!':'Riepilogo';
   let reqHtml='';
   if(pending.length&&role==='camilla'){
     reqHtml=pending.map(r=>`<div class="req-banner">
       <div class="req-banner-text"><i class="ti ti-bell" style="vertical-align:-2px;margin-right:5px"></i>Richiesta cash (${fmtDate(r.date)})</div>
-      <div style="display:flex;align-items:center;gap:8px"><span class="req-banner-amount">€${r.importoRichiesto}</span><button class="btn btn-sm btn-primary" onclick="openApprova(${r.id})">Gestisci</button></div>
+      <div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px;font-weight:700;color:var(--pink)">€${r.importoRichiesto}</span><button class="btn btn-sm btn-primary" onclick="openApprova(${r.id})">Gestisci</button></div>
     </div>`).join('');
-  }else if(pending.length&&role==='tata'){
+  } else if(pending.length&&role==='tata'){
     reqHtml=pending.map(r=>`<div class="req-banner">
       <div class="req-banner-text"><i class="ti ti-clock" style="vertical-align:-2px;margin-right:5px"></i>Richiesta €${r.importoRichiesto} — in attesa di Camilla</div>
       <button class="btn btn-sm btn-danger" onclick="deleteEntry(${r.id})">Annulla</button>
@@ -571,27 +669,25 @@ function renderHome(){
   document.getElementById('pending-reqs').innerHTML=reqHtml;
   document.getElementById('home-metrics').innerHTML=`
     <div class="metric"><div class="metric-lbl">Ore std questo mese</div><div class="metric-val col-blue">${fmtH(oreStd)}</div></div>
-    <div class="metric"><div class="metric-lbl">Ore extra accumulate</div><div class="metric-val col-teal">+${fmtH(oreExtra)}</div></div>
-  `;
-  document.getElementById('home-monte').textContent=fmtH(Math.max(0,appData.monteOre));
-  document.getElementById('home-monte-note').textContent=appData.monteOre<0?'Attenzione: monte ore negativo':appData.monteOre>=10?'Ottimo — ben coperta per agosto':'Continua ad accumulare';
+    <div class="metric"><div class="metric-lbl">Ore extra accumulate</div><div class="metric-val col-teal">+${fmtH(oreExtra)}</div></div>`;
+  document.getElementById('home-monte').textContent=fmtH(Math.max(0,monteOre));
+  document.getElementById('home-monte-note').textContent=monteOre<0?'Attenzione: monte ore negativo':monteOre>=10?'Ottimo — ben coperta per agosto':'Continua ad accumulare';
   const cc=document.getElementById('home-cash-card');
-  if(cashMese>0){cc.style.display='block';document.getElementById('home-cash-val').textContent='€'+cashMese;document.getElementById('home-cash-sub').textContent=`Ore serali × €${TARIFFA_SERALE_CASH} tariffa notturna`;}
+  if(cashMese>0){cc.style.display='block';document.getElementById('home-cash-val').textContent='€'+cashMese;document.getElementById('home-cash-sub').textContent=`Ore serali × €${TARIFFA_SERALE} tariffa notturna`;}
   else cc.style.display='none';
 }
 
-function renderStorico(){
+function renderStorico() {
   setBadges();
   const ym=document.getElementById('stor-month').value;
-  const entries=entriesForMonth(ym).sort((a,b)=>b.date.localeCompare(a.date));
+  const list=forMonth(ym).sort((a,b)=>b.date.localeCompare(a.date));
   const el=document.getElementById('stor-list');
-  if(!entries.length){el.innerHTML=`<div class="empty-state"><i class="ti ti-calendar-off"></i>Nessuna registrazione per questo mese</div>`;return;}
+  if(!list.length){el.innerHTML=`<div class="empty-state"><i class="ti ti-calendar-off"></i>Nessuna registrazione per questo mese</div>`;return;}
   const icons={standard:'ti-clock',extra:'ti-clock-plus',serale:'ti-moon',assenza:'ti-calendar-minus',richiesta_cash:'ti-coin'};
   const labels={standard:'Standard',extra:'Extra diurna',serale:'Serale',assenza:'Settimana corta',richiesta_cash:'Richiesta cash'};
   const statoLabel={in_attesa:'In attesa',approvata:'Approvata ✓',rifiutata:'Rifiutata'};
-  el.innerHTML=`<div class="card" style="padding:0 1.25rem">`+entries.map(e=>{
+  el.innerHTML=`<div class="card" style="padding:0 1.25rem">`+list.map(e=>{
     const isReq=e.type==='richiesta_cash';
-    const canEdit=!isReq;
     return`<div class="entry-row">
       <div class="entry-icon ei-${isReq?'richiesta_cash':e.type}"><i class="ti ${icons[e.type]||'ti-clock'}" style="font-size:16px"></i></div>
       <div class="entry-main">
@@ -606,42 +702,41 @@ function renderStorico(){
         </div>
       </div>
       <div class="entry-actions">
-        ${canEdit?`<button class="btn btn-sm" onclick="openEdit(${e.id})" title="Modifica"><i class="ti ti-edit"></i></button>`:''}
-        <button class="btn btn-sm btn-danger" onclick="deleteEntry(${e.id})" title="Elimina">✕</button>
+        ${!isReq?`<button class="btn btn-sm" onclick="openEdit(${e.id})"><i class="ti ti-edit"></i></button>`:''}
+        <button class="btn btn-sm btn-danger" onclick="deleteEntry(${e.id})">✕</button>
       </div>
     </div>`;
   }).join('')+'</div>';
 }
 
-function renderMese(){
+function renderMese() {
   setBadges();
   const ym=document.getElementById('mese-month').value;
-  const entries=entriesForMonth(ym);
-  const cashSerali=entries.filter(e=>e.type==='serale').reduce((s,e)=>s+e.cash,0);
-  const cashApprovati=entries.filter(e=>e.type==='richiesta_cash'&&e.stato==='approvata').reduce((s,e)=>s+e.importoRichiesto,0);
-  const pendingCash=entries.filter(e=>e.type==='richiesta_cash'&&e.stato==='in_attesa').reduce((s,e)=>s+e.importoRichiesto,0);
-  const oreExtra=entries.filter(e=>e.monteOre>0).reduce((s,e)=>s+e.monteOre,0);
-  const totale=STIPENDIO+cashSerali+cashApprovati;
+  const list=forMonth(ym);
+  const cashSerali=list.filter(e=>e.type==='serale').reduce((s,e)=>s+e.cash,0);
+  const cashAppr=list.filter(e=>e.type==='richiesta_cash'&&e.stato==='approvata').reduce((s,e)=>s+e.importoRichiesto,0);
+  const pendingCash=list.filter(e=>e.type==='richiesta_cash'&&e.stato==='in_attesa').reduce((s,e)=>s+e.importoRichiesto,0);
+  const oreExtra=list.filter(e=>e.monteOre>0).reduce((s,e)=>s+e.monteOre,0);
+  const totale=STIPENDIO+cashSerali+cashAppr;
   document.getElementById('mese-content').innerHTML=`
     <div class="card">
       <h3>${fmtMonth(ym)}</h3>
       <div class="summary-row"><span style="color:var(--text2)">Stipendio mensile fisso</span><span>€${STIPENDIO}</span></div>
       <div class="summary-row"><span style="color:var(--text2)">Cash serali (tariffa notturna)</span><span style="color:var(--amber)">${cashSerali>0?'€'+cashSerali:'—'}</span></div>
-      <div class="summary-row"><span style="color:var(--text2)">Cash extra approvati</span><span style="color:var(--amber)">${cashApprovati>0?'€'+cashApprovati:'—'}</span></div>
+      <div class="summary-row"><span style="color:var(--text2)">Cash extra approvati</span><span style="color:var(--amber)">${cashAppr>0?'€'+cashAppr:'—'}</span></div>
       ${pendingCash>0?`<div class="summary-row"><span style="color:var(--pink)">In attesa di approvazione</span><span style="color:var(--pink)">€${pendingCash}</span></div>`:''}
       <div class="summary-row"><span style="color:var(--text2)">Ore extra accumulate</span><span style="color:var(--teal)">+${fmtH(oreExtra)}</span></div>
       <div class="summary-row"><span>Totale pagato questo mese</span><span>€${totale}</span></div>
     </div>
     <div class="monte-card-inner">
-      <div style="font-size:12px;color:var(--teal);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Monte ore attuale (cumulativo)</div>
-      <div style="font-size:32px;font-weight:700;color:var(--green-dark)">${fmtH(appData.monteOre)}</div>
-      <div style="font-size:13px;color:var(--teal);margin-top:4px">${appData.monteOre>=10?'Ben coperta per agosto e settimane corte':'Continua ad accumulare'}</div>
-    </div>
-  `;
+      <div style="font-size:12px;color:var(--teal);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Monte ore cumulativo</div>
+      <div style="font-size:32px;font-weight:700;color:var(--green-dark)">${fmtH(monteOre)}</div>
+      <div style="font-size:13px;color:var(--teal);margin-top:4px">${monteOre>=10?'Ben coperta per agosto':'Continua ad accumulare'}</div>
+    </div>`;
 }
 
-document.querySelectorAll('.overlay').forEach(o=>{
-  o.addEventListener('click',function(e){if(e.target===this)this.classList.remove('active');});
+document.querySelectorAll('.overlay').forEach(o => {
+  o.addEventListener('click', function(e){ if(e.target===this) this.classList.remove('active'); });
 });
 </script>
 </body>
